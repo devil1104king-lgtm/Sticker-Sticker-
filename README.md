@@ -22,5 +22,5 @@ A Telegram bot that allows users to play a sticker game: they send a sticker, an
 ### 1. Clone the repository
 
 ```bash
-git clone https://your-repo/sticker-bot.git
+git clone https://github.com/devil1104king-lgtm/Sticker-Sticker-.git
 cd sticker-bot
