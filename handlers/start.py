@@ -1,70 +1,47 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
-from handlers.forcejoin import check_force_join
-from database import get_all_categories, set_user_category, get_user_category
-import logging
+from database import db
+from config import Config
+from keyboards.reply import get_main_menu
+from utils.decorators import ensure_user, rate_limit
 
-logger = logging.getLogger(__name__)
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@ensure_user
+@rate_limit(seconds=3, command="start")
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /start command and referral logic."""
     user = update.effective_user
-    if not user:
-        return
+    args = context.args
+    
+    # Referral Logic
+    if args and args[0].startswith("ref_"):
+        try:
+            referrer_id = int(args[0].split("_")[1])
+            if referrer_id != user.id:
+                success = await db.add_referral(referrer_id, user.id)
+                if success:
+                    await db.update_coins(referrer_id, Config.REFERRAL_REWARD, "referral_bonus")
+                    await db.update_coins(user.id, Config.REFERRAL_REWARD, "referred_bonus")
+                    await db.update_user(user.id, ref_by=referrer_id)
+                    try:
+                        await context.bot.send_message(
+                            chat_id=referrer_id,
+                            text=f"🎉 You referred [{user.first_name}](tg://user?id={user.id}) and earned {Config.REFERRAL_REWARD} coins!",
+                            parse_mode="Markdown"
+                        )
+                    except Exception:
+                        pass
+        except ValueError:
+            pass
 
-    logger.info(f"Start command from {user.id}")
-
-    if not await check_force_join(update, context):
-        return
-
-    await show_welcome_menu(update, context)
-
-async def show_welcome_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    categories = await get_all_categories()
-    keyboard = []
-    row = []
-    for i, cat in enumerate(categories):
-        button = InlineKeyboardButton(
-            f"{cat['emoji']} {cat['name']}",
-            callback_data=f"category_{cat['name']}"
-        )
-        row.append(button)
-        if len(row) == 2:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
-
-    keyboard.append([InlineKeyboardButton("ℹ️ Help", callback_data="help")])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    user = update.effective_user
-    current_cat = await get_user_category(user.id)
-
-    text = (
-        f"👋 Welcome {user.first_name}!\n\n"
-        "Select a sticker category below. Then send any sticker to get a reply from that category.\n"
-        "You can change category anytime by clicking a button.\n\n"
-        f"Current category: {current_cat or 'None selected'}"
+    welcome_text = (
+        f"👋 Welcome to the **Sticker Sticker Game Bot**, {user.first_name}!\n\n"
+        f"Challenge other players, earn coins, and rank up in the leaderboard.\n\n"
+        f"Use the menu below to navigate."
     )
-
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
-        await update.callback_query.answer()
-    else:
-        await update.message.reply_text(text, reply_markup=reply_markup)
-    logger.info(f"Welcome menu shown to {user.id}")
-
-async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    text = (
-        "🤖 **Sticker Game Bot**\n\n"
-        "1. Select a category using the buttons.\n"
-        "2. Send any sticker to the bot.\n"
-        "3. The bot will reply with a random sticker from that category.\n"
-        "4. Change category anytime by clicking a button.\n\n"
-        "Have fun! 😄"
+    
+    await update.message.reply_text(
+        text=welcome_text,
+        reply_markup=get_main_menu(),
+        parse_mode="Markdown"
     )
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 Back to Menu", callback_data="back_to_menu")]
-    ]))
+    
