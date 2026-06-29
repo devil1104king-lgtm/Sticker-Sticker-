@@ -1,3 +1,24 @@
+# Add at the top of bot.py
+from flask import Flask
+import threading
+import os
+
+app = Flask(__name__)
+
+@app.route('/')
+def health_check():
+    return "OK", 200
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
+
+# Inside main(), before application.run_polling():
+if __name__ == "__main__":
+    # Start web server in a separate thread
+    threading.Thread(target=run_web_server, daemon=True).start()
+    # Then start the bot polling
+    application.run_polling()
 #!/usr/bin/env python3
 import asyncio
 from telegram.ext import (
