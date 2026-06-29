@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import asyncio
+import os
+from threading import Thread
+from flask import Flask
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -39,12 +42,25 @@ from handlers.admin import (
 from handlers.errors import error_handler
 from utils.logger import logger
 
-def main():
-    """Start the bot."""
-    # Initialize database
-    asyncio.run(init_db())
+# ------ Optional web server for Render/Railway ------
+app = Flask(__name__)
 
-    # Create application
+@app.route('/')
+def health():
+    return "OK", 200
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
+
+# ---------------------------------------------------
+
+async def main():
+    """Main async entry point."""
+    # Initialize database
+    await init_db()
+
+    # Build application
     application = Application.builder().token(Config.BOT_TOKEN).build()
 
     # ----- Handlers -----
@@ -64,14 +80,14 @@ def main():
     application.add_handler(CommandHandler("backup", backup_command))
     application.add_handler(CommandHandler("admin", admin_panel))
 
-    # Sticker handler (must come after force join check inside)
+    # Sticker handler
     application.add_handler(MessageHandler(filters.Sticker.ALL, sticker_handler))
 
-    # Callback query handler
-    application.add_handler(CallbackQueryHandler(callback_handler, pattern="^(?!admin_).*"))  # non-admin callbacks
+    # Callback query handlers
+    application.add_handler(CallbackQueryHandler(callback_handler, pattern="^(?!admin_).*"))
     application.add_handler(CallbackQueryHandler(admin_callback, pattern="^admin_.*"))
 
-    # Remove sticker command (text handler for removal)
+    # Text handler for removing sticker (admin)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_sticker_removal))
 
     # Conversation for adding sticker
@@ -91,9 +107,16 @@ def main():
     # Error handler
     application.add_error_handler(error_handler)
 
-    # Start bot
+    # Start the bot
     logger.info("Bot started polling...")
-    application.run_polling(allowed_updates=["message", "callback_query"])
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    await application.idle()
 
 if __name__ == "__main__":
-    main()
+    # Start web server if PORT env var is set (for Render/Railway)
+    if os.environ.get("PORT"):
+        Thread(target=run_web, daemon=True).start()
+    # Run the bot's async main
+    asyncio.run(main())
