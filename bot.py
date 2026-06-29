@@ -40,4 +40,4 @@ async def main() -> None:
     job_queue.run_repeating(backup_database_job, interval=43200, first=10)
 
     log.info("Bot is polling...")
-    await app.run_polling()
+    app.run_polling()
