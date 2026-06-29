@@ -1,18 +1,18 @@
 import logging
 import sys
 
-def setup_logger():
-    """Configure logging for the bot."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    # Suppress noisy libraries
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("telegram").setLevel(logging.INFO)
-    return logging.getLogger(__name__)
+def setup_logger(name: str) -> logging.Logger:
+    """Setup and return a configured logger instance."""
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        logger.setLevel(logging.INFO)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
+    return logger
 
-logger = setup_logger()
+log = setup_logger("StickerBot")
