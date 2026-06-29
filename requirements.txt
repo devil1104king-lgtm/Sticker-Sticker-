@@ -1,11 +1,5 @@
-python-telegram-bot==21.11.1
-aiosqlite==0.20.0
-python-dotenv==1.0.1
-Pillow==11.1.0
-aiofiles==24.1.0
-httpx==0.28.1
-orjson==3.10.15
-cachetools==5.5.2
-APScheduler==3.11.0
-Flask==3.1.0
-gunicorn==23.0.0
+python-telegram-bot[job-queue,rate-limiter]>=21.11.1
+aiosqlite>=0.20.0
+python-dotenv>=1.0.1
+Flask>=3.0.3
+gunicorn>=22.0.0
